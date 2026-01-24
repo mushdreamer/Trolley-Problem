@@ -1,17 +1,26 @@
 using UnityEngine;
 using System.Collections.Generic;
 
+public enum TrolleyDirection
+{
+    Forward,
+    Left,
+    Random,
+}
+
 public class TrolleyWaypointController : MonoBehaviour
 {
+    [HideInInspector] public TrolleyDirection nextDir;
+
     [Header("Path Settings")]
     // Common path: from start to the junction (include the junction point)
     public Transform[] commonPath;
 
     // Straight branch: points after the junction for the straight track
-    public Transform[] straightPath;
+    public Transform[] forwardPath;
 
     // Side branch: points after the junction for the side track
-    public Transform[] sidePath;
+    public Transform[] leftPath;
 
     [Header("Movement Settings")]
     public float speed = 5f;
@@ -23,6 +32,7 @@ public class TrolleyWaypointController : MonoBehaviour
 
     // Private state variables (declared only, initialized in Start)
     private bool isSideTrackSelected;
+    private Transform[] selectedPath;
     private Queue<Transform> currentPathQueue;
     private Transform currentTargetPoint;
     private bool isOnCommonPath;
@@ -34,6 +44,7 @@ public class TrolleyWaypointController : MonoBehaviour
         isSideTrackSelected = false; // Default to straight track
         isOnCommonPath = true;
         currentPathQueue = new Queue<Transform>();
+        nextDir = TrolleyDirection.Forward; // TODO: Change to forward or random depending on which scenario is chosen in the options
 
         // Load the common path into the queue at the start
         if (commonPath != null && commonPath.Length > 0)
@@ -56,14 +67,6 @@ public class TrolleyWaypointController : MonoBehaviour
     {
         // If there is no target, stop execution
         if (currentTargetPoint == null) return;
-
-        // Input detection: Space bar to switch tracks
-        // Only allow switching while on the common path (before the junction)
-        if (isOnCommonPath && Input.GetKeyDown(KeyCode.Space))
-        {
-            isSideTrackSelected = !isSideTrackSelected;
-            Debug.Log("Track switched. Side track selected: " + isSideTrackSelected);
-        }
 
         // Movement Logic: Move towards the current target point
         transform.position = Vector3.MoveTowards(transform.position, currentTargetPoint.position, speed * Time.deltaTime);
@@ -92,8 +95,23 @@ public class TrolleyWaypointController : MonoBehaviour
         {
             isOnCommonPath = false; // We are now leaving the common path
 
-            // Select the path based on the boolean state
-            Transform[] selectedPath = isSideTrackSelected ? sidePath : straightPath;
+            // Select the next path
+            switch (nextDir)
+            {
+                case TrolleyDirection.Forward:
+                    selectedPath = forwardPath;
+                    break;
+                case TrolleyDirection.Left:
+                    selectedPath = leftPath;
+                    break;
+                case TrolleyDirection.Random:
+                    // TODO: Random direction scenario
+                    break;
+                default:
+                    // Should not get here
+                    Debug.Log("Invalid trolley direction selected");
+                    break;
+            }
 
             if (selectedPath != null)
             {
@@ -101,7 +119,7 @@ public class TrolleyWaypointController : MonoBehaviour
                 {
                     currentPathQueue.Enqueue(point);
                 }
-                Debug.Log("Entering branch: " + (isSideTrackSelected ? "Side Track" : "Straight Track"));
+                Debug.Log("Entering branch: " + ((selectedPath == leftPath) ? "Side Track" : "Straight Track"));
             }
         }
     }
@@ -145,6 +163,25 @@ public class TrolleyWaypointController : MonoBehaviour
                 // Remove the tag so we don't trigger the collision logic multiple times
                 other.tag = "Untagged";
             }
+        }
+    }
+
+    public void OnClickLeft()
+    {
+        if (isOnCommonPath)
+        {
+            nextDir = TrolleyDirection.Left;
+            Debug.Log("Track switched. Left track selected");
+        }
+            
+    }
+
+    public void OnClickForward()
+    {
+        if (isOnCommonPath)
+        {
+            nextDir = TrolleyDirection.Forward;
+            Debug.Log("Track switched. Forward track selected");
         }
     }
 }
