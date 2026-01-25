@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine.SceneManagement;
 
 public class TrolleyWaypointController : MonoBehaviour
 {
@@ -26,7 +27,7 @@ public class TrolleyWaypointController : MonoBehaviour
     private Queue<Transform> currentPathQueue;
     private Transform currentTargetPoint;
     private bool isOnCommonPath;
-
+    bool isRandomized;
     void Start()
     {
         // === Safe Initialization ===
@@ -50,6 +51,10 @@ public class TrolleyWaypointController : MonoBehaviour
         {
             Debug.LogError("Error: Common Path is not set in the Inspector!");
         }
+        //detect scenario             ===================================
+        string sceneName = SceneManager.GetActiveScene().name;
+        Debug.Log("Current Scene: " + sceneName);
+
     }
 
     void Update()
@@ -64,6 +69,22 @@ public class TrolleyWaypointController : MonoBehaviour
             isSideTrackSelected = !isSideTrackSelected;
             Debug.Log("Track switched. Side track selected: " + isSideTrackSelected);
         }
+
+        //test logic for scenario 2                             ======================================
+        if (!isRandomized && SceneManager.GetActiveScene().name == "TestScenario2")
+        {
+            int r = Random.Range(0, 2);
+            Debug.Log("random number r is randomly generated as " + r);
+
+            if (r == 1)
+            {
+                isSideTrackSelected = !isSideTrackSelected;
+                Debug.Log("Simulated SPACE press via r = 1");
+            }
+
+            isRandomized = true;
+        }
+
 
         // Movement Logic: Move towards the current target point
         transform.position = Vector3.MoveTowards(transform.position, currentTargetPoint.position, speed * Time.deltaTime);
