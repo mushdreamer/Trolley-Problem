@@ -40,9 +40,12 @@ public class TrolleyWaypointController : MonoBehaviour
     {
         // === Safe Initialization ===
         // Initialize variables here to ensure they run on the Main Thread
+
+        nextDir = GameState.nextDir;//newly tested
+
         isOnCommonPath = true;
         currentPathQueue = new Queue<Transform>();
-        nextDir = TrolleyDirection.Forward; // TODO: Change to forward or random depending on which scenario is chosen in the options
+       // nextDir = TrolleyDirection.Forward; // TODO: Change to forward or random depending on which scenario is chosen in the options
 
         // Load the common path into the queue at the start
         if (commonPath != null && commonPath.Length > 0)
