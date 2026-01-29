@@ -1,5 +1,6 @@
-using UnityEngine;
 using System.Collections.Generic;
+using UnityEngine;
+using UnityEngine.Splines;
 
 public enum TrolleyDirection
 {
@@ -10,137 +11,131 @@ public enum TrolleyDirection
 
 public class TrolleyWaypointController : MonoBehaviour
 {
-    [HideInInspector] private TrolleyDirection nextDir;
+    public SplineAnimate anim;
 
-    [Header("Path Settings")]
-    // Common path: from start to the junction (include the junction point)
-    public Transform[] commonPath;
+    [Header("Containers (each has ONLY one spline)")]
+    public SplineContainer Trunk;
+    public SplineContainer Left;
+    public SplineContainer Right;
 
-    // Straight branch: points after the junction for the straight track
-    public Transform[] forwardPath;
+    private string junctionTag = "SplineTrigger"; // triggers the train to turn left or right
+    private string mergeTag = "MergeTrigger";     // triggers the train to drive back to common path or trunk
 
-    // Side branch: points after the junction for the side track
-    public Transform[] leftPath;
+    [HideInInspector] public TrolleyDirection nextDir;
 
-    [Header("Movement Settings")]
-    public float speed = 5f;
-    public float rotationSpeed = 5f;
-
-    [Header("Physics Settings")]
-    // Impact force applied to the victim (higher value = flies further)
-    public float impactForce = 15f;
-
-    // Private state variables (declared only, initialized in Start)
-    private Transform[] selectedPath;
-    private Queue<Transform> currentPathQueue;
-    private Transform currentTargetPoint;
-    private bool isOnCommonPath;
+    private enum TrackState
+    {
+        OnTrunk,
+        OnLeft,
+        OnRight,
+    }
+    private TrackState state = TrackState.OnTrunk;
 
     void Start()
     {
-        // === Safe Initialization ===
-        // Initialize variables here to ensure they run on the Main Thread
-
-        nextDir = GameState.nextDir;//newly tested
-
-        isOnCommonPath = true;
-        currentPathQueue = new Queue<Transform>();
-       // nextDir = TrolleyDirection.Right; // TODO: Change to forward or random depending on which scenario is chosen in the options
-
-        // Load the common path into the queue at the start
-        if (commonPath != null && commonPath.Length > 0)
-        {
-            foreach (Transform point in commonPath)
-            {
-                currentPathQueue.Enqueue(point);
-            }
-
-            // Get the first target point
-            GetNextPoint();
-        }
-        else
-        {
-            Debug.LogError("Error: Common Path is not set in the Inspector!");
-        }
+        nextDir = GameState.nextDir;
+        if (!anim) anim = GetComponent<SplineAnimate>();
+        GoToTrunk(); // start with common path or trunk
     }
 
     void Update()
     {
-        // If there is no target, stop execution
-        if (currentTargetPoint == null) return;
-
-        // Movement Logic: Move towards the current target point
-        transform.position = Vector3.MoveTowards(transform.position, currentTargetPoint.position, speed * Time.deltaTime);
-
-        // Rotation Logic: Smoothly rotate towards the target direction
-        Vector3 direction = currentTargetPoint.position - transform.position;
-        if (direction != Vector3.zero)
-        {
-            Quaternion targetRotation = Quaternion.LookRotation(direction);
-            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
-        }
-
-        // Check if the trolley has reached the current target point
-        if (Vector3.Distance(transform.position, currentTargetPoint.position) < 0.1f)
-        {
-            CheckAndLoadNextPathSegment();
-            GetNextPoint();
-        }
+        
     }
 
-    // Checks if the common path is finished and loads the selected branch
-    void CheckAndLoadNextPathSegment()
+    void OnTriggerEnter(Collider other)
     {
-        // If queue is empty and we are still marked as being on the common path
-        if (currentPathQueue.Count == 0 && isOnCommonPath)
+        // triggers turn left or right here
+        if (other.CompareTag(junctionTag) && state == TrackState.OnTrunk)
         {
-            isOnCommonPath = false; // We are now leaving the common path
-
             if (nextDir == TrolleyDirection.Random)
             {
                 // Random.Range includes lower but excludes upper when used with ints
                 nextDir = (TrolleyDirection)Random.Range(0, 2);
             }
 
-            // Select the next path
             switch (nextDir)
             {
                 case TrolleyDirection.Right:
-                    selectedPath = forwardPath;
+                    GoToRight();
                     break;
                 case TrolleyDirection.Left:
-                    selectedPath = leftPath;
+                    GoToLeft();
                     break;
                 default:
                     // Should not get here
                     Debug.Log("Invalid trolley direction selected");
                     break;
             }
+        }
 
-            if (selectedPath != null)
-            {
-                foreach (Transform point in selectedPath)
-                {
-                    currentPathQueue.Enqueue(point);
-                }
-                Debug.Log("Entering branch: " + ((selectedPath == leftPath) ? "Side Track" : "Straight Track"));
-            }
+        // 2) triggers anim on common path or trunk
+        if (other.CompareTag(mergeTag) && (state == TrackState.OnLeft || state == TrackState.OnRight))
+        {
+            GoToTrunk();
+            nextDir = GameState.nextDir; // Reset branch selection
+            return;
         }
     }
 
-    // Dequeues the next point from the path list
-    void GetNextPoint()
+    void GoToTrunk()
     {
-        if (currentPathQueue.Count > 0)
+        state = TrackState.OnTrunk;
+        anim.Container = Trunk;
+        SafeRestart();
+    }
+
+    void GoToLeft()
+    {
+        state = TrackState.OnLeft;
+        anim.Container = Left;
+        SafeRestart();
+    }
+
+    void GoToRight()
+    {
+        state = TrackState.OnRight;
+        anim.Container = Right;
+        SafeRestart();
+    }
+
+    void SafeRestart()
+    {
+        //
+        try
         {
-            currentTargetPoint = currentPathQueue.Dequeue();
+            anim.Restart(true);
+            return;
         }
-        else
+        catch { }
+
+        //
+        anim.enabled = false;
+        anim.enabled = true;
+    }
+
+    public void OnClickLeft()
+    {
+        if (state == TrackState.OnTrunk)
         {
-            currentTargetPoint = null;
-            Debug.Log("Destination reached.");
+            nextDir = TrolleyDirection.Left;
+            Debug.Log("Track switched. Left track selected");
+        }
+
+    }
+
+    public void OnClickRight()
+    {
+        if (state == TrackState.OnTrunk)
+        {
+            nextDir = TrolleyDirection.Right;
+            Debug.Log("Track switched. Right track selected");
         }
     }
+
+    /*[Header("Physics Settings")]
+    // Impact force applied to the victim (higher value = flies further)
+    public float impactForce = 15f;
 
     // === Physics Collision Logic ===
     void OnTriggerEnter(Collider other)
@@ -168,24 +163,5 @@ public class TrolleyWaypointController : MonoBehaviour
                 other.tag = "Untagged";
             }
         }
-    }
-
-    public void OnClickLeft()
-    {
-        if (isOnCommonPath)
-        {
-            nextDir = TrolleyDirection.Left;
-            Debug.Log("Track switched. Left track selected");
-        }
-            
-    }
-
-    public void OnClickForward()
-    {
-        if (isOnCommonPath)
-        {
-            nextDir = TrolleyDirection.Right;
-            Debug.Log("Track switched. Forward track selected");
-        }
-    }
+    }*/
 }

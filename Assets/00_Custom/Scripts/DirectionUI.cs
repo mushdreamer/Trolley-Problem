@@ -3,8 +3,7 @@ using UnityEngine.UI;
 
 public class DirectionUI : MonoBehaviour
 {
-    //[SerializeField] private TrolleyWaypointController trolley;
-    [SerializeField] private SplineScriptTest trolley;
+    [SerializeField] private TrolleyWaypointController trolley;
     [SerializeField] private GameObject leftArrow;
     [SerializeField] private GameObject rightArrow;
     [SerializeField] private GameObject random;
